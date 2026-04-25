@@ -1,0 +1,32 @@
+{
+  "landing": {
+    "hero": {
+      "title": "Detect AI-written text in seconds",
+      "subtitle": "Built for students. Supports English, Russian, and Mongolian."
+    },
+    "cta": "Try the detector"
+  },
+  "detector": {
+    "placeholder": "Paste at least 100 characters of text to analyze…",
+    "submit": "Analyze",
+    "submitting": "Analyzing…",
+    "charCount": "{count} / 100 characters",
+    "error": "Something went wrong. Please try again.",
+    "result": {
+      "aiScore": "AI probability",
+      "humanScore": "Human probability",
+      "perSentence": "Per-sentence breakdown"
+    }
+  },
+  "nav": {
+    "detector": "Detector",
+    "pricing": "Pricing",
+    "login": "Log in"
+  },
+  "languageSwitcher": {
+    "label": "Language",
+    "en": "English",
+    "ru": "Russian",
+    "mn": "Mongolian"
+  }
+}

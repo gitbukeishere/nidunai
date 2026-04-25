@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --version)",
+      "PowerShell(pnpm --version)",
+      "PowerShell(node --version)",
+      "Bash(node -e \"try { const m = require\\('C:/Nidun AI/node_modules/.pnpm/@tailwindcss+oxide@4.2.4/node_modules/@tailwindcss/oxide-win32-x64-msvc/tailwindcss-oxide.win32-x64-msvc.node'\\); console.log\\('LOADED OK', Object.keys\\(m\\).slice\\(0,5\\)\\); } catch\\(e\\) { console.log\\('ERR:', e.message\\); console.log\\(e.code\\); }\")",
+      "Bash(curl -sf -o /dev/null http://localhost:3000/en)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/en)",
+      "Bash(curl -s http://localhost:3000/ru)",
+      "Bash(curl -s http://localhost:3000/mn)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST http://localhost:3000/api/detect -H \"content-type: application/json\" -d '{\"text\":\"too short\",\"language\":\"en\"}')",
+      "Bash(time curl *)"
+    ]
+  }
+}
