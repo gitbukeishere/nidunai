@@ -2,20 +2,36 @@
 
 AI-written text detector for students. Trilingual UI: **English**, **Russian**, **Mongolian**.
 
-> Status: **scaffold only**. The detection logic at `POST /api/detect` is a randomised mock with a 1.5 s artificial delay so the loading and result UI states are exercisable end-to-end. Plug in real detection later behind the same Zod-validated contract.
+> Status: **scaffold only**. The detection logic at `POST /api/detect` is a randomised mock with a 1.5 s artificial delay so the loading and result UI states are exercisable end-to-end. Plug in real detection later by calling the FastAPI service from this route.
 
 ---
 
-## Stack
+## Architecture
 
 | Layer | Choice |
 |---|---|
+| Frontend hosting | **Vercel** |
 | Framework | Next.js 15 (App Router, TypeScript, `src/`) |
+| Backend (MVP) | **Next.js API routes** (same Vercel deployment) |
+| Database / Auth / Storage | **Supabase** (Postgres + Auth + Storage) |
+| AI model backend (later) | **FastAPI**, hosted separately (e.g. Fly.io / Render / Modal) |
 | Styling | Tailwind v4 + shadcn/ui (slate, CSS variables) |
 | i18n | next-intl 4 with `[locale]` dynamic segment routing |
 | Validation | Zod |
-| Backend SDKs | Firebase v12 (client) + firebase-admin v13 (server) |
 | Package manager | pnpm |
+
+```
+[ Browser ]
+    │
+    ▼
+[ Vercel — Next.js (frontend + /api routes) ]
+    │                 │
+    │ auth/db/storage │ inference
+    ▼                 ▼
+[ Supabase ]      [ FastAPI (separate host) ]
+```
+
+The Next.js API routes are the single backend surface the browser talks to. They call Supabase for auth/data/storage and forward inference requests to the FastAPI service when it's ready. Keeping the model out of the Vercel function lets us pick a host with GPUs / longer timeouts without touching the web app.
 
 ---
 
@@ -23,6 +39,7 @@ AI-written text detector for students. Trilingual UI: **English**, **Russian**, 
 
 - **Node.js 20+** (Node 22 recommended)
 - **pnpm 9+** — install with `corepack enable && corepack prepare pnpm@latest --activate`, or `npm i -g pnpm`
+- A **Supabase** project (free tier is fine for MVP)
 
 ---
 
@@ -31,7 +48,7 @@ AI-written text detector for students. Trilingual UI: **English**, **Russian**, 
 ```bash
 pnpm install
 cp .env.local.example .env.local
-# fill in Firebase values (see below) — placeholder values work for visual smoke testing
+# fill in Supabase values (see below)
 pnpm dev
 ```
 
@@ -41,32 +58,23 @@ Open [http://localhost:3000](http://localhost:3000). The middleware redirects `/
 
 ## Environment variables
 
-Copy `.env.local.example` to `.env.local` and fill these in:
+Copy `.env.local.example` to `.env.local` and fill these in.
 
-### Client (browser-exposed) — `NEXT_PUBLIC_FIREBASE_*`
+### Client (browser-exposed)
 
-Get them from **Firebase Console → Project Settings → General → Your apps → Web app config**:
+Get them from **Supabase Dashboard → Project Settings → API**:
 
-| Var | Where it lives in the Firebase config |
+| Var | Source |
 |---|---|
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | `apiKey` |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `authDomain` |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `projectId` |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `storageBucket` |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | `appId` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `anon` public API key |
 
-### Admin (server-only) — `FIREBASE_ADMIN_*`
+### Server-only
 
-Generate at **Firebase Console → Project Settings → Service Accounts → Generate new private key**. Open the downloaded JSON and copy:
-
-| Var | JSON field |
+| Var | Source |
 |---|---|
-| `FIREBASE_ADMIN_PROJECT_ID` | `project_id` |
-| `FIREBASE_ADMIN_CLIENT_EMAIL` | `client_email` |
-| `FIREBASE_ADMIN_PRIVATE_KEY` | `private_key` (wrap in quotes; keep `\n` escapes — the loader converts them) |
-
-> The scaffold pages don't call Firebase yet, so the app renders fine with placeholder values. Real values are needed before adding Auth, Firestore reads/writes, or Storage uploads.
+| `SUPABASE_SERVICE_ROLE_KEY` | `service_role` secret key — **never** expose to the browser |
+| `AI_BACKEND_URL` | Base URL of the FastAPI service (set later, when it exists) |
 
 ---
 
@@ -103,7 +111,7 @@ src/
 │   │   ├── layout.tsx
 │   │   ├── page.tsx               # landing
 │   │   └── detector/page.tsx
-│   └── api/detect/route.ts        # mock detector endpoint
+│   └── api/detect/route.ts        # mock detector endpoint (will proxy to FastAPI)
 ├── components/
 │   ├── nav.tsx
 │   ├── language-switcher.tsx
@@ -112,13 +120,25 @@ src/
 └── lib/
     ├── utils.ts                   # cn()
     ├── detect-schema.ts           # shared Zod schema + types
-    └── firebase/
-        ├── client.ts              # browser SDK init
-        └── admin.ts               # server SDK init (lazy, env-driven)
+    └── supabase/
+        ├── client.ts              # browser client (anon key)
+        ├── server.ts              # SSR client (cookie-bound, RLS-respecting)
+        └── admin.ts               # service-role client (server-only, bypasses RLS)
 ```
+
+---
+
+## Deploying
+
+1. Push the repo to GitHub.
+2. Import it into **Vercel** — framework auto-detected as Next.js.
+3. Add the env vars above in Vercel **Project Settings → Environment Variables** for Production and Preview.
+4. Deploy.
+
+The FastAPI service is deployed independently on its own host once the model is ready; the API route reads `AI_BACKEND_URL` to find it.
 
 ---
 
 ## Replacing the mock detector
 
-When you're ready to plug in real detection, edit `src/app/api/detect/route.ts`. The Zod schema in `src/lib/detect-schema.ts` is shared between client and server, so changing the request/response shape updates both.
+When the FastAPI service is ready, edit `src/app/api/detect/route.ts` to forward the validated request to `${process.env.AI_BACKEND_URL}/detect` and return its response. The Zod schema in `src/lib/detect-schema.ts` is shared between client and server, so changing the request/response shape updates both.
